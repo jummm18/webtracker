@@ -7,7 +7,8 @@
 
 Dashboard berbasis web untuk memantau lokasi real-time perangkat pelacak sampah plastik di perairan menggunakan IoT, GPS, MQTT, dan teknologi web modern.
 
-![Dashboard Preview](https://trackerfpikunsoed.my.id/screenshot-dashboard.png) *(opsional: tambahkan screenshot saat sudah ada)*
+![Dashboard Preview](<img width="1919" height="1087" alt="image" src="https://github.com/user-attachments/assets/773858db-0dab-48ce-8b03-1ea4f34e9d42" />
+)
 
 ---
 
@@ -88,20 +89,20 @@ webtracker/
 3. **Buat file `.env`** di root proyek (contoh):
    ```env
    DB_HOST=localhost
-   DB_USER=gpsjuman
-   DB_PASS=lupakatasandi18
-   DB_NAME=trackerdb
+   DB_USER=gps123
+   DB_PASS=tracking
+   DB_NAME=tracking
    PORT=3000
    MQTT_BROKER=mqtt://trackerfpikunsoed.my.id:1884
-   MQTT_GPS_TOPIC=tracker/gps
-   MQTT_CONTROL_TOPIC=tracker/control/all
+   MQTT_GPS_TOPIC=tracker/saya
+   MQTT_CONTROL_TOPIC=tracker/control/semua
    ```
 
 4. **Buat database dan tabel di MySQL**
    ```sql
    CREATE DATABASE trackerdb;
    USE trackerdb;
-   CREATE TABLE tracker_gps (
+   CREATE TABLE tracking (
      id INT AUTO_INCREMENT PRIMARY KEY,
      device_id VARCHAR(50) NOT NULL,
      latitude DECIMAL(10, 8) NOT NULL,
