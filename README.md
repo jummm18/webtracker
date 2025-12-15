@@ -7,9 +7,6 @@
 
 Dashboard berbasis web untuk memantau lokasi real-time perangkat pelacak sampah plastik di perairan menggunakan IoT, GPS, MQTT, dan teknologi web modern.
 
-![Dashboard Preview](<img width="1919" height="1087" alt="image" src="https://github.com/user-attachments/assets/773858db-0dab-48ce-8b03-1ea4f34e9d42" />
-)
-
 ---
 
 ## 📌 Fitur Utama
