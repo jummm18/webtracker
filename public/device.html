@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Device Tracker - <span id="device-title">...</span></title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #ffffff;
+      color: #212529;
+      display: flex;
+      height: auto;
+      min-height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar {
+      width: 280px;
+      background: #f8f9fa;
+      border-right: 1px solid #dee2e6;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #dee2e6;
+      width: 100%;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-unsoed {
+      width: 32px;
+      height: auto;
+      display: block;
+    }
+
+    .back {
+      color: #0d6efd;
+      text-decoration: none;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .device-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0d6efd;
+      text-align: center;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    .control-section {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      min-width: 90px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .btn.off {
+      background: #dc3545;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    input[type="number"] {
+      padding: 8px;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #212529;
+      border: 1px solid #ced4da;
+      width: 90px;
+      font-size: 16px;
+      text-align: center;
+    }
+
+    label {
+      font-size: 14px;
+      color: #495057;
+      white-space: nowrap;
+    }
+
+    .log-container {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 12px;
+      flex: 1;
+      overflow-y: auto;
+      font-size: 12px;
+      max-height: 120px;
+    }
+
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #dee2e6;
+    }
+
+    .log-time {
+      color: #6c757d;
+      font-size: 11px;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .map-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      min-height: 300px;
+      height: 40vh;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+      min-height: 300px;
+      touch-action: pan-x pan-y;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      color: #6c757d;
+      padding: 8px;
+      background: #ffffff;
+      border-top: 1px solid #dee2e6;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        padding: 16px 12px;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+      }
+
+      .header {
+        padding: 12px;
+      }
+
+      .header-top {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .device-title {
+        text-align: left;
+        margin-top: 0;
+      }
+
+      .control-group {
+        justify-content: flex-start;
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 12px 18px;
+        font-size: 15px;
+      }
+
+      .log-container {
+        max-height: 100px;
+      }
+
+      .main-content {
+        width: 100%;
+      }
+
+      .map-container {
+        min-height: 400px;
+        height: 50vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="header">
+      <div class="header-top">
+        <div class="logo-container">
+          <img src="/assets/images/logounsoed.png" alt="UNSOED" class="logo-unsoed">
+          <a href="/index.html" class="back">← Dashboard</a>
+        </div>
+      </div>
+      <h2 class="device-title" id="device-title">Loading...</h2>
+    </div>
+
+    <div class="control-section">
+      <h3 style="font-size:14px; margin-bottom:8px; color:#0d6efd;">Control Device</h3>
+      <div class="control-group">
+        <button class="btn" id="led-on">LED ON</button>
+        <button class="btn off" id="led-off">LED OFF</button>
+      </div>
+      <div class="control-group">
+        <label>Interval (detik):</label>
+        <input type="number" id="interval" min="1" value="60" step="1">
+        <button class="btn" id="set-interval">Set</button>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3 style="font-size:14px; margin-bottom:8px; color:#0d6efd;">Historical Data</h3>
+      <div class="control-group">
+        <label>Tiap (detik):</label>
+        <input type="number" id="history-interval-input" min="1" value="60" step="1">
+      </div>
+      <div class="control-group">
+        <label>Dalam jam:</label>
+        <input type="number" id="history-hours-input" min="1" value="24" step="1">
+      </div>
+      <button class="btn" id="load-history">Load History</button>
+    </div>
+
+    <div class="log-container" id="log">
+      <div style="color:#6c757d; font-size:12px; text-align:center; padding:10px;">Log will appear here</div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="map-container">
+      <div id="map"></div>
+    </div>
+    <div class="footer">© 2025 Tracker Sampah Plastik Laut - Jumantoro L1C022006</div>
+  </div>
+
+  <script src="https://trackerfpikunsoed.my.id/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const deviceId = urlParams.get('id');
+    if (!deviceId) {
+      alert('Device ID tidak ditemukan!');
+      window.location.href = '/index.html';
+    }
+
+    document.getElementById('device-title').textContent = deviceId;
+
+    const map = L.map('map').setView([-7.7167, 109.0167], 13);
+
+    const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a> | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const marker = L.marker([-7.7167, 109.0167], {
+      icon: L.divIcon({
+        html: `<svg width="30" height="40" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+          <path d="M50,5 C45,5 40,10 40,15 L40,110 C40,115 45,120 50,120 C55,120 60,115 60,110 L60,15 C60,10 55,5 50,5 Z" 
+                fill="#0d6efd" stroke="#000" stroke-width="2"/>
+          <rect x="42" y="0" width="16" height="8" rx="2" fill="#0a58ca"/>
+        </svg>`,
+        className: '',
+        iconSize: [36, 44],
+        iconAnchor: [18, 42]
+      })
+    }).addTo(map);
+
+    const polyline = L.polyline([], { color: '#0d6efd', weight: 3 }).addTo(map);
+    let history = [];
+
+    const socket = io('https://trackerfpikunsoed.my.id', {
+      transports: ['websocket'],
+      secure: true
+    });
+
+    socket.on('newLocation', (data) => {
+      if (data.device_id === deviceId) {
+        marker.setLatLng([data.latitude, data.longitude]);
+        history.push([data.latitude, data.longitude]);
+        polyline.setLatLngs(history);
+        map.setView([data.latitude, data.longitude], 14);
+        addLog(`[Real-time] ${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`);
+      }
+    });
+
+    function addLog(message) {
+      const now = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${now}]</span> ${message}`;
+      const log = document.getElementById('log');
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    document.getElementById('led-on').addEventListener('click', () => {
+      socket.emit('ledControl', { deviceId, state: 'on' });
+      addLog('💡 LED ON');
+    });
+    document.getElementById('led-off').addEventListener('click', () => {
+      socket.emit('ledControl', { deviceId, state: 'off' });
+      addLog('💡 LED OFF');
+    });
+
+    document.getElementById('set-interval').addEventListener('click', () => {
+      const sec = parseInt(document.getElementById('interval').value);
+      if (isNaN(sec) || sec < 1) {
+        alert('Interval minimal 1 detik.');
+        return;
+      }
+      socket.emit('setIntervalToDevice', { deviceId, interval: sec * 1000 });
+      addLog(`⏱️ Interval set to ${sec} sec`);
+    });
+
+    document.getElementById('load-history').addEventListener('click', async () => {
+      const intervalInput = document.getElementById('history-interval-input');
+      const hoursInput = document.getElementById('history-hours-input');
+
+      let interval = parseInt(intervalInput.value);
+      let hours = parseInt(hoursInput.value);
+
+      if (isNaN(interval) || interval < 1) {
+        alert('Interval historis minimal 1 detik.');
+        return;
+      }
+      if (isNaN(hours) || hours < 1) {
+        alert('Jam terakhir minimal 1 jam.');
+        return;
+      }
+
+      try {
+        addLog(`⏳ Loading historical data (every ${interval}s, last ${hours}h)...`);
+        const res = await fetch(`https://trackerfpikunsoed.my.id/api/history?device_id=${encodeURIComponent(deviceId)}&interval=${interval}&hours=${hours}`);
+        const data = await res.json();
+        
+        if (data.length === 0) {
+          addLog('⚠️ No historical data found');
+          return;
+        }
+
+        history = data.map(pt => [pt.latitude, pt.longitude]);
+        polyline.setLatLngs(history);
+        map.setView([data[0].latitude, data[0].longitude], 12);
+        addLog(`✅ Loaded ${data.length} points`);
+      } catch (err) {
+        addLog(`❌ Failed: ${err.message}`);
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>

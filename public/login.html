@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Tracker Sampah Plastik Laut</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #e6f2ff 0%, #ffffff 100%);
+      color: #212529;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 900px;
+      overflow: hidden;
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .header {
+      width: 100%;
+      padding: 16px 24px;
+      border-bottom: 1px solid #dee2e6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0d6efd;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-img {
+      width: 28px;
+      height: auto;
+      display: block;
+    }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a {
+      text-decoration: none;
+      color: #495057;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .login-section {
+      width: 100%;
+      max-width: 400px;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .login-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #212529;
+      margin-bottom: 24px;
+    }
+    .input-group {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #ced4da;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    .input-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6c757d;
+      font-size: 16px;
+    }
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .illustration-section {
+      width: 100%;
+      max-width: 500px;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    .illustration {
+      width: 100%;
+      max-width: 360px;
+      height: auto;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.1));
+    }
+    .footer {
+      width: 100%;
+      text-align: center;
+      padding: 16px;
+      font-size: 12px;
+      color: #6c757d;
+      border-top: 1px solid #dee2e6;
+    }
+    @media (max-width: 768px) {
+      .container { flex-direction: column; }
+      .login-section { max-width: 100%; padding: 32px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <img src="/assets/images/logounsoed.png" alt="UNSOED" class="logo-img">
+        Tracker Sampah Plastik Laut
+      </div>
+      <div class="nav-links">
+        <a href="mailto:jumantoro@mhs.unsoed.ac.id">CONTACT</a>
+        <a href="#" class="active">LOG IN</a>
+      </div>
+    </div>
+
+    <div class="login-section">
+      <h1 class="login-title">Log in</h1>
+      <form id="login-form">
+        <div class="input-group">
+          <span class="input-icon">👤</span>
+          <input type="text" id="username" name="username" placeholder="Username" required />
+        </div>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="password" name="password" placeholder="Password" required />
+        </div>
+        <button type="submit" class="btn-login">Log in</button>
+      </form>
+    </div>
+
+    <div class="illustration-section">
+      <img src="/assets/images/illustration-login.png" alt="Illustration" class="illustration" onerror="this.style.display='none'">
+    </div>
+
+    <div class="footer">
+      © 2025 Tracker Sampah Plastik Laut — Jumantoro L1C022006
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (username === 'gpsjuman' && password === 'lupakatasandi18') {
+        localStorage.setItem('isLoggedIn', 'true');
+        window.location.href = '/index.html';
+      } else {
+        alert('Username atau password salah.');
+      }
+    });
+  </script>
+</body>
+</html>
