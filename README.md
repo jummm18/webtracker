@@ -143,7 +143,7 @@ Proyek ini dikembangkan sebagai bagian dari **skripsi** di Program Studi Ilmu Ke
 
 - **Penulis**: Jumantoro  
 - **NIM**: L1C022006  
-- **Email**: jumantoro@mhs.unsoed.ac.id  
+- **Email**: jumant391@gmail.com 
 - **Institusi**: Universitas Jenderal Soedirman (UNSOED)
 
 ---
