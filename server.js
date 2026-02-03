@@ -1,6 +1,7 @@
 // ==============================
 // SERVER UTAMA - Tracker Sampah Plastik Laut
 // Tesis Jumantoro L1C022006 - UNSOED
+// Login via Google OAuth + IoT Tracker
 // ==============================
 
 require('dotenv').config();
@@ -11,6 +12,10 @@ const socketIo = require('socket.io');
 const mqtt = require('mqtt');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,12 +23,73 @@ const io = socketIo(server);
 
 // === CORS ===
 app.use(cors({
-  origin: 'https://trackerfpikunsoed.my.id', // pastikan tidak ada spasi!
+  origin: ['https://trackerfpikunsoed.my.id', 'http://localhost:3000'],
   methods: ['GET', 'POST'],
   credentials: true
 }));
 
-// === Konfigurasi dari .env ===
+// === Session & Passport Setup (untuk Google OAuth) ===
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'gps-tracker-session-secret-2025',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 jam
+  }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// === Serialization ===
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+// === Google OAuth Strategy (diperbarui untuk simpan data lengkap) ===
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "https://trackerfpikunsoed.my.id/auth/google/callback"
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const email = profile.emails?.[0]?.value?.toLowerCase();
+    if (!email) {
+      return done(null, false, { message: 'Email tidak tersedia dari Google.' });
+    }
+
+    const allowedDomains = ['@mhs.unsoed.ac.id', '@unsоed.ac.id'];
+    const isValidDomain = allowedDomains.some(domain => email.endsWith(domain));
+    if (!isValidDomain) {
+      return done(null, false, { message: 'Hanya email dari UNSOED yang diizinkan.' });
+    }
+
+    const username = email.split('@')[0];
+    const full_name = profile.displayName || username;
+    const google_id = profile.id;
+
+    // Simpan atau update user
+    await db.execute(`
+      INSERT INTO users (username, full_name, google_id, email, last_login)
+      VALUES (?, ?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        full_name = VALUES(full_name),
+        google_id = VALUES(google_id),
+        last_login = NOW()
+    `, [username, full_name, google_id, email]);
+
+    return done(null, { email, full_name });
+  } catch (err) {
+    console.error('Google OAuth DB Error:', err.message);
+    return done(err);
+  }
+}));
+
+// === Middleware ===
+app.use(express.json());
+app.use(express.static('public'));
+
+// === Konfigurasi ===
 const CONFIG = {
   PORT: parseInt(process.env.PORT) || 3000,
   DB_HOST: process.env.DB_HOST || 'localhost',
@@ -61,7 +127,55 @@ async function connectDB() {
   }
 }
 
-// === Koneksi MQTT ===
+// === Rute OAuth Google ===
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: '/login.html?error=unauthorized'
+  }),
+  (req, res) => {
+    res.redirect('/auth/success');
+  }
+);
+
+// Halaman sukses: set localStorage dengan data lengkap
+app.get('/auth/success', (req, res) => {
+  const user = req.session.passport?.user;
+  if (!user || !user.email) {
+    return res.redirect('/login.html?error=session');
+  }
+
+  const { email, full_name } = user;
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Login Berhasil</title></head>
+    <body style="font-family: sans-serif; text-align: center; padding: 40px;">
+      <h2>✅ Login Berhasil</h2>
+      <p>Mengalihkan ke dashboard...</p>
+      <script>
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userEmail', '${email}');
+        localStorage.setItem('userFullName', '${full_name || email}');
+        window.location.href = '/index.html';
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// Logout
+app.post('/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) return res.status(500).json({ error: 'Gagal logout' });
+    res.json({ success: true });
+  });
+});
+
+// === MQTT & Fitur IoT ===
 const mqttClient = mqtt.connect(CONFIG.MQTT_BROKER, {
   reconnectPeriod: 5000,
   clientId: 'server-tracker-' + Math.random().toString(16).substr(2, 8)
@@ -115,41 +229,66 @@ mqttClient.on('message', async (topic, payload) => {
   }
 });
 
-// === API: Download data 24 jam (WIB) ===
+// === API IoT ===
+// === API DOWNLOAD 24 JAM (WIB) ===
 app.get('/api/download-last-24h', async (req, res) => {
   try {
+    // WIB sekarang
     const nowWIB = new Date(Date.now() + 7 * 60 * 60 * 1000);
-    const cutoffUTC = new Date(nowWIB.getTime() - 24 * 60 * 60 * 1000 - 7 * 60 * 60 * 1000);
+
+    // Cutoff 24 jam terakhir (UTC)
+    const cutoffUTC = new Date(
+      nowWIB.getTime() - 24 * 60 * 60 * 1000 - 7 * 60 * 60 * 1000
+    );
 
     const [rows] = await db.execute(
-      `SELECT device_id, latitude, longitude, waktu_gps, waktu
+      `SELECT 
+         device_id,
+         latitude,
+         longitude,
+         waktu_gps,
+         waktu
        FROM tracker_gps
        WHERE waktu >= ?
        ORDER BY waktu DESC`,
       [cutoffUTC]
     );
 
+    // Helper format tanggal WIB seragam
+    const formatWIB = (date) =>
+      new Date(date.getTime() + 7 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 19)
+        .replace('T', ' ');
+
+    // Generate CSV
     const csv = [
-      'device_id,latitude,longitude,waktu_gps_wib,waktu_db_wib',
+      'waktu_gps_wib,waktu_db_wib,device_id,latitude,longitude',
       ...rows.map(r => {
-        const gpsWIB = new Date(new Date(r.waktu_gps).getTime() + 7 * 60 * 60 * 1000);
-        const dbWIB = new Date(new Date(r.waktu).getTime() + 7 * 60 * 60 * 1000);
-        const gpsStr = gpsWIB.toISOString().replace('T', ' ').replace('.000Z', '');
-        const dbStr = dbWIB.toISOString().replace('T', ' ').replace('.000Z', '');
-        return `"${r.device_id}",${r.latitude},${r.longitude},"${gpsStr}","${dbStr}"`;
+        const gpsStr = formatWIB(new Date(r.waktu_gps));
+        const dbStr  = formatWIB(new Date(r.waktu));
+
+        return `"${gpsStr}","${dbStr}","${r.device_id}",${r.latitude},${r.longitude}`;
       })
     ].join('\n');
 
+    // Response header
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="tracker_data_24h_wib.csv"');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="tracker_data_24h_wib.csv"'
+    );
+
+    // BOM agar Excel tidak rusak
     res.send('\uFEFF' + csv);
+
   } catch (err) {
     console.error('❌ CSV Export Error:', err);
     res.status(500).send('Gagal mengunduh data');
   }
 });
 
-// === API: Lokasi terbaru semua device ===
+
 app.get('/api/latest-devices', async (req, res) => {
   try {
     const [rows] = await db.execute(`
@@ -172,7 +311,6 @@ app.get('/api/latest-devices', async (req, res) => {
       longitude: parseFloat(row.longitude),
       waktu_gps: new Date(row.waktu_gps).toISOString()
     }));
-
     res.json(formatted);
   } catch (err) {
     console.error('❌ Gagal ambil data terakhir:', err);
@@ -180,17 +318,12 @@ app.get('/api/latest-devices', async (req, res) => {
   }
 });
 
-// === API: Histori per device ===
 app.get('/api/history', async (req, res) => {
   const { device_id, interval = 60, hours = 24 } = req.query;
-
-  if (!device_id) {
-    return res.status(400).json({ error: 'device_id required' });
-  }
+  if (!device_id) return res.status(400).json({ error: 'device_id required' });
 
   const intervalSec = parseInt(interval);
   const hoursNum = parseInt(hours);
-
   if (isNaN(intervalSec) || intervalSec < 1 || intervalSec > 86400) {
     return res.status(400).json({ error: 'Invalid interval (1–86400 seconds)' });
   }
@@ -209,7 +342,6 @@ app.get('/api/history', async (req, res) => {
 
     let lastTimestamp = 0;
     const filtered = [];
-
     for (const row of rows) {
       const sec = Math.floor(new Date(row.waktu_gps).getTime() / 1000);
       if (lastTimestamp === 0 || sec - lastTimestamp >= intervalSec) {
@@ -222,7 +354,6 @@ app.get('/api/history', async (req, res) => {
         lastTimestamp = sec;
       }
     }
-
     res.json(filtered);
   } catch (err) {
     console.error('❌ History error:', err);
@@ -230,10 +361,7 @@ app.get('/api/history', async (req, res) => {
   }
 });
 
-// === Static files (login.html, index.html, assets) ===
-app.use(express.static('public'));
-
-// === Socket.IO: Kontrol perangkat ===
+// === Socket.IO (TETAP SAMA) ===
 io.on('connection', (socket) => {
   socket.on('setIntervalToDevice', (data) => {
     const { deviceId, interval } = data;
@@ -243,11 +371,8 @@ io.on('connection', (socket) => {
     }
     const payload = JSON.stringify({ command: 'set_interval', interval, target: deviceId });
     mqttClient.publish(CONFIG.MQTT_CONTROL_TOPIC, payload, { qos: 0 }, (err) => {
-      if (err) {
-        socket.emit('commandResponse', { message: '❌ Gagal kirim ke perangkat' });
-      } else {
-        socket.emit('commandResponse', { message: `✅ Interval diatur ke ${interval/1000} detik` });
-      }
+      if (err) socket.emit('commandResponse', { message: '❌ Gagal kirim ke perangkat' });
+      else socket.emit('commandResponse', { message: `✅ Interval diatur ke ${interval/1000} detik` });
     });
   });
 
@@ -259,28 +384,24 @@ io.on('connection', (socket) => {
     }
     const payload = JSON.stringify({ command: 'led', state, target: deviceId });
     mqttClient.publish(CONFIG.MQTT_CONTROL_TOPIC, payload, { qos: 0 }, (err) => {
-      if (err) {
-        socket.emit('commandResponse', { message: `❌ Gagal kirim LED ke ${deviceId}` });
-      } else {
-        socket.emit('commandResponse', { message: `✅ LED ${state} untuk ${deviceId}` });
-      }
+      if (err) socket.emit('commandResponse', { message: `❌ Gagal kirim LED ke ${deviceId}` });
+      else socket.emit('commandResponse', { message: `✅ LED ${state} untuk ${deviceId}` });
     });
   });
 });
 
-// === Redirect root ke login ===
+// === Static & Redirect Root ===
 app.get('/', (req, res) => {
   res.redirect('/login.html');
 });
 
-// === Jalankan server ===
-server.listen(CONFIG.PORT, () => {
-  console.log(`🚀 Server berjalan di http://localhost:${CONFIG.PORT}`);
+// === Jalankan Server ===
+server.listen(CONFIG.PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server berjalan di http://202.10.40.237:${CONFIG.PORT}`);
   console.log(`🌐 Akses: https://trackerfpikunsoed.my.id`);
   connectDB();
 });
 
-// === Graceful shutdown ===
 process.on('SIGINT', async () => {
   console.log('\n🛑 Menutup koneksi...');
   mqttClient.end();
