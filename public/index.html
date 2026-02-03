@@ -4,12 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Pemantauan Tracker Sampah Plastik Laut</title>
-  <!-- PROTEKSI LOGIN -->
+  <!-- PROTEKSI LOGIN DIPERKUAT -->
   <script>
-    if (!localStorage.getItem('isLoggedIn')) {
-      alert('Silakan login terlebih dahulu.');
-      window.location.href = '/login.html';
-    }
+    (() => {
+      const email = localStorage.getItem('userEmail');
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      const valid = email && (
+        email.endsWith('@mhs.unsoed.ac.id') || 
+        email.endsWith('@unsоed.ac.id')
+      );
+
+      if (!isLoggedIn || !valid) {
+        localStorage.clear();
+        window.location.href = '/login.html';
+      }
+    })();
   </script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -58,6 +67,15 @@
       font-weight: 700;
       color: #0d6efd;
     }
+    .user-info {
+      font-size: 13px;
+      color: #6c757d;
+      margin-top: 4px;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -94,6 +112,13 @@
     }
     .btn:hover {
       background: #0b5ed7;
+    }
+    .btn-logout {
+      background: #dc3545;
+      border-color: #dc3545;
+    }
+    .btn-logout:hover {
+      background: #c82333;
     }
     .btn-icon {
       width: 32px;
@@ -267,6 +292,7 @@
       .header { gap: 8px; }
       .header-top { flex-direction: column; align-items: stretch; }
       .title { font-size: 18px; text-align: center; }
+      .user-info { text-align: center; margin-top: 6px; }
       .controls { justify-content: center; gap: 8px; flex-wrap: wrap; }
       .interval-control { width: 100%; max-width: none; margin: 0 auto; justify-content: center; }
       .btn-icon { width: 30px; height: 30px; font-size: 14px; }
@@ -289,11 +315,15 @@
   <div class="container">
     <div class="header">
       <div class="header-top">
-        <div class="logo-container">
-          <img src="/assets/images/logounsoed.png" alt="UNSOED" class="logo-unsoed">
-          <div class="title">Dashboard Pemantauan Tracker Sampah Plastik Laut</div>
+        <div>
+          <div class="logo-container">
+            <img src="/assets/images/logounsoed.png" alt="UNSOED" class="logo-unsoed">
+            <div class="title">Dashboard Pemantauan Tracker Sampah Plastik Laut</div>
+          </div>
+          <div class="user-info" id="user-display"></div>
         </div>
         <div class="controls">
+          <div class="btn btn-logout" id="btn-logout">Logout</div>
           <div class="interval-control">
             <span style="color:#6c757d;">Interval (detik):</span>
             <input type="number" class="interval-input" id="interval-input" min="1" value="30">
@@ -341,7 +371,27 @@
   <script src="https://trackerfpikunsoed.my.id/socket.io/socket.io.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // === INISIALISASI GLOBAL ===
+    // === TAMPILKAN NAMA USER ===
+    const fullName = localStorage.getItem('userFullName') || localStorage.getItem('userEmail');
+    document.getElementById('user-display').textContent = `Login sebagai: ${fullName}`;
+
+    // === LOGOUT ===
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      if (confirm('Yakin ingin keluar?')) {
+        fetch('/auth/logout', { method: 'POST' })
+          .then(() => {
+            localStorage.clear();
+            alert('Anda telah logout.');
+            window.location.href = '/login.html';
+          })
+          .catch(err => {
+            console.error(err);
+            alert('Gagal logout.');
+          });
+      }
+    });
+
+    // === SISA KODE IoT TETAP SAMA (tidak diubah) ===
     const colorPalette = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14', '#20c997', '#6610f2'];
     const markers = {};
     const polylines = {};
@@ -357,15 +407,13 @@
     const deviceListEl = document.getElementById('device-list');
     const logPanel = document.getElementById('log-panel');
 
-    // === PETA ===
     const map = L.map('map', {
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
       dragging: true,
       touchZoom: true,
       doubleClickZoom: true
     }).setView([-7.7167, 109.0167], 12);
 
-    // === LAYER PETA DENGAN ATRIBUSI RESMI ===
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     });
@@ -394,7 +442,6 @@
     const layerControl = L.control.layers(baseLayers).addTo(map);
     layerControl.collapse();
 
-    // === EVENT MAP CONTROLS ===
     document.getElementById('toggle-layers').addEventListener('click', () => {
       layerControl._expanded ? layerControl.collapse() : layerControl.expand();
     });
@@ -402,7 +449,6 @@
     document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
     document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
 
-    // === FUNGSI UTILITAS ===
     function addLog(message) {
       const now = new Date().toLocaleTimeString();
       const entry = document.createElement('div');
@@ -442,7 +488,6 @@
       });
     }
 
-    // === TAMPILKAN DAFTAR DEVICE ===
     function updateDeviceList() {
       const allDeviceIds = new Set([...devices, ...Object.keys(latestDeviceData)]);
       if (allDeviceIds.size === 0) {
@@ -502,7 +547,6 @@
       deviceListEl.innerHTML = html;
     }
 
-    // === SOCKET.IO ===
     const socket = io('https://trackerfpikunsoed.my.id', {
       transports: ['websocket'],
       secure: true
@@ -573,7 +617,6 @@
       addLog(`📍 ${data.device_id} → [${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}]`);
     });
 
-    // === FETCH DATA TERAKHIR DARI DATABASE ===
     async function loadLatestDevices() {
       try {
         const res = await fetch('https://trackerfpikunsoed.my.id/api/latest-devices');
@@ -632,7 +675,6 @@
     loadLatestDevices();
     setInterval(updateDeviceList, 30000);
 
-    // === EVENT LAINNYA ===
     document.getElementById('set-interval').addEventListener('click', () => {
       const input = document.getElementById('interval-input');
       const seconds = parseInt(input.value);
